@@ -26,7 +26,18 @@ def square_coords(src_lat: float, src_long: float, distance: float) -> tuple:
 
 @numba.jit(signature=(numba.float64, numba.float64, numba.float64))
 def within(src_lat: float, src_long: float, distance: float) -> bool:
-
+    """
+    Takes a source point, a candidate point and a distance and returns True if the candidate point is within a radius
+    of distance of the source point. Uses the Vincenty formula for maximum accuracy
+    :param src_lat: latitude of source point
+    :param src_long: longitude of source point
+    :param distance: test radius around source point
+    :return: a bool designating whether the the candidate point is within radius 'distance' of source point
+    """
+    # TODO maybe vectorise this to handle being passed a source point and a list/pandas Series of candidate points?
+    print('Under Construction')
+    isinregion = False
+    return isinregion
 
 
 def main():
