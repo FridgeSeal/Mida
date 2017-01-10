@@ -96,25 +96,28 @@ def timeexecution(func_name: str, test_func: object, **kwargs):
     time_list = []
     for i in range(1000):
         start = timeit.default_timer()
-        test_func(kwargs)
+        test_func(**kwargs)
         end = timeit.default_timer()
         exec_time = end - start
         time_list.append(exec_time)
-    print(f'{func_name} took  on average {exec_time} to run')
+    print(f'{func_name} took  on average {sum(time_list)/float(len(time_list))} to run')
+    print(f'Best execution time was {min(time_list)} out of 1000 runs')
 
 
 def main():
     print('Under construction for now')
-    data = {'base_lat': -36.92145616,
-            'base_long': 174.66654809,
-            'candidate1_lat': -36.954954955,
-            'candidate1_long': 174.902135476,
-            'candidate2_lat': -36.55154,
-            'candidate2_long': 174.39573,
-            'test_dist': 64
-            }
-    timeexecution()
-    return None
+    base_lat = -36.92145616
+    base_long = 174.66654809
+    candidate1_lat = -36.954954955
+    candidate1_long = 174.902135476
+    candidate2_lat = -36.921149
+    candidate2_long = 174.665469
+    test_dist = 50
+    timeexecution('square coords numba', square_coords_numba, base_lat, base_long, test_dist)
+    timeexecution('square coords numba', square_coords_plain, base_lat, base_long, test_dist)
+    timeexecution('within_numba', within_numba, base_lat, base_long, candidate2_lat, candidate2_long, test_dist)
+    timeexecution('within_plain', within_plain, base_lat, base_long, candidate2_lat, candidate2_long, test_dist)
+
 
 if __name__ == '__main__':
     main()
