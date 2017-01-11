@@ -9,10 +9,13 @@ import timeit
 def haversine(lat: float, long: float, theta: float, dist: float) -> tuple:
     r = 6371008  # Average radius of Earth according to NASA Earth factsheet
     delta = dist / r
-    phi2 = math.asin(math.sin(lat) * math.cos(delta) + math.cos(lat) * math.sin(delta) * math.cos(theta))
-    lambda2 = long + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(lat),
-                                math.cos(delta) - math.sin(lat) * math.sin(phi2))
-    return phi2, lambda2
+    phi1 = math.radians(lat)
+    lambda1 = math.radians(long)
+    theta = math.radians(theta)
+    phi2 = math.asin(math.sin(phi1) * math.cos(delta) + math.cos(phi1) * math.sin(delta) * math.cos(theta))
+    lambda2 = lambda1 + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(phi1),
+                                   math.cos(delta) - math.sin(phi1) * math.sin(phi2))
+    return math.degrees(phi2), math.degrees(lambda2)
 
 
 @numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64))
@@ -29,25 +32,6 @@ def square_coords_numba(src_lat: float, src_long: float, distance: float) -> tup
     r_val = (local_f(src_lat, src_long, 0, distance), local_f(src_lat, src_long, 90, distance),
              local_f(src_lat, src_long, 180, distance), local_f(src_lat, src_long, 270, distance))
     return r_val
-
-
-def square_coords_plain(src_lat: float, src_long: float, distance: float) -> tuple:
-    """
-    Returns a tuple of coordinates that form the boundary lines of a square whose sides are a specified distance
-    away from the the source points (scr_lat, src_long)
-    :param src_lat: latitude of the source point
-    :param src_long: longitude of the source point
-    :param distance: maximum distance from source point
-    :return: tuple of points in the following order: North, East, South West
-    """
-    def f(theta: float):
-        r = 6_371_008  # Equatorial radius of earth in metres according to the NASA Earth factsheet
-        delta = distance / r
-        phi2 = math.asin(math.sin(src_lat) * math.cos(delta) + math.cos(src_lat) * math.sin(delta) * math.cos(theta))
-        lambda2 = src_long + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(src_lat),
-                                        math.cos(delta) - math.sin(src_lat) * math.sin(phi2))
-        return phi2, lambda2
-    return f(0), f(90), f(180), f(270)
 
 
 @numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64, numba.float64, numba.float64))
@@ -83,11 +67,11 @@ def within_numba(src_lat: float, src_long: float, cndt_lat: float, cndt_long: fl
 def timeexecution(func_name: str, test_func: object, **kwargs):
     time_list = []
     for i in range(100):
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         res = test_func(**kwargs)
-        end = timeit.default_timer()
-        exec_time = end - start
-        time_list.append(exec_time)
+        # end = timeit.default_timer()
+        # exec_time = end - start
+        # time_list.append(exec_time)
     print(f'{func_name} took  on average {sum(time_list)/float(len(time_list))} to run')
     print(f'Best execution time was {min(time_list)} out of 1000 runs')
 
@@ -102,11 +86,6 @@ def main():
     test_dist = 50
     timeexecution(func_name='square coords numba',
                   test_func=square_coords_numba,
-                  src_lat=base_lat,
-                  src_long=base_long,
-                  distance=test_dist)
-    timeexecution(func_name='square coords plain',
-                  test_func=square_coords_plain,
                   src_lat=base_lat,
                   src_long=base_long,
                   distance=test_dist)
