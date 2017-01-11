@@ -5,7 +5,17 @@ import numba
 import timeit
 
 
-@numba.jit(signature=(numba.float64, numba.float64, numba.float64), nopython=True)
+@numba.jit(signature_or_function=(numba.types.UniTuple(numba.float64, 2))(numba.float64, numba.float64, numba.float64, numba.float64))
+def haversine(lat: float, long: float, theta: float, dist: float) -> tuple:
+    r = 6371008  # Average radius of Earth according to NASA Earth factsheet
+    delta = dist / r
+    phi2 = math.asin(math.sin(lat) * math.cos(delta) + math.cos(lat) * math.sin(delta) * math.cos(theta))
+    lambda2 = long + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(lat),
+                                math.cos(delta) - math.sin(lat) * math.sin(phi2))
+    return phi2, lambda2
+
+
+@numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64))
 def square_coords_numba(src_lat: float, src_long: float, distance: float) -> tuple:
     """
     Returns a tuple of coordinates that form the boundary lines of a square whose sides are a specified distance
@@ -15,15 +25,10 @@ def square_coords_numba(src_lat: float, src_long: float, distance: float) -> tup
     :param distance: maximum distance from source point
     :return: tuple of points in the following order: North, East, South West
     """
-    @numba.jit(signature=numba.float64, nopython=True)
-    def f(theta: float):
-        r = 6378137  # Equatorial radius of earth according to the WGS84 Standard (Used for GPS)
-        delta = distance / r
-        phi2 = math.asin(math.sin(src_lat) * math.cos(delta) + math.cos(src_lat) * math.sin(delta) * math.cos(theta))
-        lambda2 = src_long + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(src_lat),
-                                        math.cos(delta) - math.sin(src_lat) * math.sin(phi2))
-        return phi2, lambda2
-    return f(0), f(90), f(180), f(270)
+    local_f = haversine
+    r_val = (local_f(src_lat, src_long, 0, distance), local_f(src_lat, src_long, 90, distance),
+             local_f(src_lat, src_long, 180, distance), local_f(src_lat, src_long, 270, distance))
+    return r_val
 
 
 def square_coords_plain(src_lat: float, src_long: float, distance: float) -> tuple:
@@ -36,7 +41,7 @@ def square_coords_plain(src_lat: float, src_long: float, distance: float) -> tup
     :return: tuple of points in the following order: North, East, South West
     """
     def f(theta: float):
-        r = 6378137  # Equatorial radius of earth according to the WGS84 Standard (Used for GPS)
+        r = 6_371_008  # Equatorial radius of earth in metres according to the NASA Earth factsheet
         delta = distance / r
         phi2 = math.asin(math.sin(src_lat) * math.cos(delta) + math.cos(src_lat) * math.sin(delta) * math.cos(theta))
         lambda2 = src_long + math.atan2(math.sin(theta) * math.sin(delta) * math.cos(src_lat),
@@ -45,7 +50,7 @@ def square_coords_plain(src_lat: float, src_long: float, distance: float) -> tup
     return f(0), f(90), f(180), f(270)
 
 
-@numba.jit(signature=(numba.float64, numba.float64, numba.float64, numba.float64, numba.float64))
+@numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64, numba.float64, numba.float64))
 def within_numba(src_lat: float, src_long: float, cndt_lat: float, cndt_long: float, distance: float) -> bool:
     """
     Takes a source point, a candidate point and a distance and returns True if the candidate point is within a radius
@@ -58,45 +63,28 @@ def within_numba(src_lat: float, src_long: float, cndt_lat: float, cndt_long: fl
     :return: a bool designating whether the the candidate point is within radius 'distance' of source point
     """
     # TODO maybe vectorise this to handle being passed a source point and a list/pandas Series of candidate points?
-    r: float = 6378137.0  # WGS-84 ellipsoid semi-major axis parameter used for Earth radius
-    d = 2 * r * math.asin(math.sqrt((0.5 * (1 - math.cos(cndt_lat - src_lat))) +
-                                    (math.cos(src_lat) * math.cos(cndt_lat) *
-                                     0.5 * (1 - math.cos(cndt_long - src_long)))))  # Haversine formula
+    r: float = float(6371000.00)  # WGS-84 ellipsoid semi-major axis parameter used for Earth radius
+    deltaphi = math.radians(0.5 * (cndt_lat - src_lat))
+    deltalambda = math.radians(0.5 * (cndt_long - src_long))
+    phi1 = math.radians(src_lat)
+    phi2 = math.radians(cndt_lat)
+    a = math.sin(deltaphi) * math.sin(deltaphi) + math.cos(phi1) * math.cos(phi2) *\
+        math.sin(deltalambda) * math.sin(deltalambda)
+    d = 2 * r * math.asin(math.sqrt(a))
+    # print('d is ', d)
     if d < distance:
         isinregion = True
     else:
         isinregion = False
-    return isinregion
-
-
-def within_plain(src_lat: float, src_long: float, cndt_lat: float, cndt_long: float, distance: float) -> bool:
-    """
-    Takes a source point, a candidate point and a distance and returns True if the candidate point is within a radius
-    of distance of the source point. Uses the Haversine formula for balance between acccuracy and simplicity
-    :param src_lat: latitude of source point
-    :param src_long: longitude of source point
-    :param distance: test radius around source point
-    :param cndt_lat: latitude of candidate point
-    :param cndt_long: longitude of candidate point
-    :return: a bool designating whether the the candidate point is within radius 'distance' of source point
-    """
-    # TODO maybe vectorise this to handle being passed a source point and a list/pandas Series of candidate points?
-    r: float = 6378137.0  # WGS-84 ellipsoid semi-major axis parameter used for Earth radius
-    d = 2 * r * math.asin(math.sqrt((0.5 * (1 - math.cos(cndt_lat - src_lat))) +
-                                    (math.cos(src_lat) * math.cos(cndt_lat) *
-                                     0.5 * (1 - math.cos(cndt_long - src_long)))))  # Haversine formula
-    if d < distance:
-        isinregion = True
-    else:
-        isinregion = False
+    # print(f'The point is in the region: {isinregion} - Numba')
     return isinregion
 
 
 def timeexecution(func_name: str, test_func: object, **kwargs):
     time_list = []
-    for i in range(1000):
+    for i in range(100):
         start = timeit.default_timer()
-        test_func(**kwargs)
+        res = test_func(**kwargs)
         end = timeit.default_timer()
         exec_time = end - start
         time_list.append(exec_time)
@@ -105,7 +93,6 @@ def timeexecution(func_name: str, test_func: object, **kwargs):
 
 
 def main():
-    print('Under construction for now')
     base_lat = -36.92145616
     base_long = 174.66654809
     candidate1_lat = -36.954954955
@@ -113,10 +100,23 @@ def main():
     candidate2_lat = -36.921149
     candidate2_long = 174.665469
     test_dist = 50
-    timeexecution('square coords numba', square_coords_numba, base_lat, base_long, test_dist)
-    timeexecution('square coords numba', square_coords_plain, base_lat, base_long, test_dist)
-    timeexecution('within_numba', within_numba, base_lat, base_long, candidate2_lat, candidate2_long, test_dist)
-    timeexecution('within_plain', within_plain, base_lat, base_long, candidate2_lat, candidate2_long, test_dist)
+    timeexecution(func_name='square coords numba',
+                  test_func=square_coords_numba,
+                  src_lat=base_lat,
+                  src_long=base_long,
+                  distance=test_dist)
+    timeexecution(func_name='square coords plain',
+                  test_func=square_coords_plain,
+                  src_lat=base_lat,
+                  src_long=base_long,
+                  distance=test_dist)
+    timeexecution(func_name='within_numba',
+                  test_func=within_numba,
+                  src_lat=base_lat,
+                  src_long=base_long,
+                  cndt_lat=candidate2_lat,
+                  cndt_long=candidate2_long,
+                  distance=test_dist)
 
 
 if __name__ == '__main__':
