@@ -1,12 +1,4 @@
-import math
-import numba
-import greatcircledistance
-
-
-
-
-
-
+# DEPRECATED
 
 
 def main():

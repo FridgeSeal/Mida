@@ -1,5 +1,5 @@
 def within_square(candidate_lat: float, candidate_long: float, bndry_lat1: float, bndry_lat2: float,
-                        bndry_long1: float, bndry_long2: float) -> bool:
+                  bndry_long1: float, bndry_long2: float) -> bool:
     """
     Takes a left + right boundary longitudes and top + bottom boundary latitudes, and returns True if the candidate
     point is contained within. Strangely enough, numba.@jit version is slower than plain python version...
