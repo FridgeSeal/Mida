@@ -92,18 +92,6 @@ def within_radius(src_lat: float, src_long: float, cndt_lat: float, cndt_long: f
     return isinregion
 
 
-def timeexecution(func_name: str, test_func: object, **kwargs):
-    time_list = []
-    for i in range(100):
-        # start = timeit.default_timer()
-        res = test_func(**kwargs)
-        # end = timeit.default_timer()
-        # exec_time = end - start
-        # time_list.append(exec_time)
-    print(f'{func_name} took  on average {sum(time_list)/float(len(time_list))} to run')
-    print(f'Best execution time was {min(time_list)} out of 1000 runs')
-
-
 def main():
     base_lat = -36.92145616
     base_long = 174.66654809
@@ -112,19 +100,6 @@ def main():
     candidate2_lat = -36.921149
     candidate2_long = 174.665469
     test_dist = 50
-    timeexecution(func_name='square coords numba',
-                  test_func=generate_square,
-                  src_lat=base_lat,
-                  src_long=base_long,
-                  distance=test_dist)
-    timeexecution(func_name='within_numba',
-                  test_func=within_radius,
-                  src_lat=base_lat,
-                  src_long=base_long,
-                  cndt_lat=candidate2_lat,
-                  cndt_long=candidate2_long,
-                  distance=test_dist)
-
 
 if __name__ == '__main__':
     main()
