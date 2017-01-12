@@ -5,7 +5,8 @@ import numba
 import timeit
 
 
-@numba.jit(signature_or_function=(numba.types.UniTuple(numba.float64, 2))(numba.float64, numba.float64, numba.float64, numba.float64))
+@numba.jit(signature_or_function=(numba.types.UniTuple(numba.float64, 2))(numba.float64, numba.float64, numba.float64,
+                                                                          numba.float64))
 def haversine(lat: float, long: float, theta: float, dist: float) -> tuple:
     r = 6371008  # Average radius of Earth according to NASA Earth factsheet
     delta = dist / r
@@ -19,7 +20,7 @@ def haversine(lat: float, long: float, theta: float, dist: float) -> tuple:
 
 
 @numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64))
-def square_coords_numba(src_lat: float, src_long: float, distance: float) -> tuple:
+def generate_square(src_lat: float, src_long: float, distance: float) -> tuple:
     """
     Returns a tuple of coordinates that form the boundary lines of a square whose sides are a specified distance
     away from the the source points (scr_lat, src_long)
@@ -29,13 +30,40 @@ def square_coords_numba(src_lat: float, src_long: float, distance: float) -> tup
     :return: tuple of points in the following order: North, East, South West
     """
     local_f = haversine
-    r_val = (local_f(src_lat, src_long, 0, distance), local_f(src_lat, src_long, 90, distance),
-             local_f(src_lat, src_long, 180, distance), local_f(src_lat, src_long, 270, distance))
+    r_val = (local_f(src_lat, src_long, 0, distance)[0], local_f(src_lat, src_long, 90, distance)[1],
+             local_f(src_lat, src_long, 180, distance)[0], local_f(src_lat, src_long, 270, distance)[1])
+    # We are specifying the index for each one because we only want the latitude (index 0) on the North and South
+    # coordinates and the longitude (index 1) on the East and West coordinates because we are only interested in the
+    # boundary values so that we can test membership by simply going 'is point x in a < x_lat < b and c < x_long < d
     return r_val
 
 
+def within_square(candidate_lat: float, candidate_long: float, bndry_lat1: float, bndry_lat2: float,
+                        bndry_long1: float, bndry_long2: float) -> bool:
+    """
+    Takes a left + right boundary longitudes and top + bottom boundary latitudes, and returns True if the candidate
+    point is contained within. Strangely enough, numba.@jit version is slower than plain python version...
+    :param candidate_lat: latitude of the point whose membership is being tested
+    :param candidate_long: longitude of the point whose membership is being tested
+    :param bndry_lat1: left side latitude boundary
+    :param bndry_lat2: right side latitude boundary
+    :param bndry_long1: top side longitude boundary
+    :param bndry_long2: bottom side longitude boundary
+    :return: a boolean value indicating whether the point is within the region
+    """
+    if bndry_lat1 > bndry_lat2:
+        bndry_lat1, bndry_lat2 = bndry_lat2, bndry_lat1
+    if bndry_long1 > bndry_long2:  # We don't need an explicit else case for these as we don't want to do anything
+        bndry_long1, bndry_long2 = bndry_long2, bndry_long1  # in the <= case and it's handled implicitly
+    if (bndry_lat1 < candidate_lat < bndry_lat2) and (bndry_long1 < candidate_long < bndry_long2):
+        isinregion = True
+    else:
+        isinregion = False
+    return isinregion
+
+
 @numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64, numba.float64, numba.float64))
-def within_numba(src_lat: float, src_long: float, cndt_lat: float, cndt_long: float, distance: float) -> bool:
+def within_radius(src_lat: float, src_long: float, cndt_lat: float, cndt_long: float, distance: float) -> bool:
     """
     Takes a source point, a candidate point and a distance and returns True if the candidate point is within a radius
     of distance of the source point. Uses the Haversine formula for balance between acccuracy and simplicity
@@ -52,8 +80,8 @@ def within_numba(src_lat: float, src_long: float, cndt_lat: float, cndt_long: fl
     deltalambda = math.radians(0.5 * (cndt_long - src_long))
     phi1 = math.radians(src_lat)
     phi2 = math.radians(cndt_lat)
-    a = math.sin(deltaphi) * math.sin(deltaphi) + math.cos(phi1) * math.cos(phi2) *\
-        math.sin(deltalambda) * math.sin(deltalambda)
+    a = math.sin(deltaphi) * math.sin(deltaphi) + math.cos(phi1) * math.cos(phi2) * \
+                                                  math.sin(deltalambda) * math.sin(deltalambda)
     d = 2 * r * math.asin(math.sqrt(a))
     # print('d is ', d)
     if d < distance:
@@ -85,12 +113,12 @@ def main():
     candidate2_long = 174.665469
     test_dist = 50
     timeexecution(func_name='square coords numba',
-                  test_func=square_coords_numba,
+                  test_func=generate_square,
                   src_lat=base_lat,
                   src_long=base_long,
                   distance=test_dist)
     timeexecution(func_name='within_numba',
-                  test_func=within_numba,
+                  test_func=within_radius,
                   src_lat=base_lat,
                   src_long=base_long,
                   cndt_lat=candidate2_lat,
