@@ -21,6 +21,6 @@ setuptools.setup(
         'Programming Language :: Python :: 3.6'
     ],
     keywords='greatcircledistance',
-    packages=setuptools.find_packages('greatcircle'),
+    packages=setuptools.find_packages(),
     install_requires=['numba']
 )
