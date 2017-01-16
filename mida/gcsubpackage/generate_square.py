@@ -1,6 +1,7 @@
 import numba
 import greatcircledistance
 
+
 @numba.jit(signature_or_function=(numba.float64, numba.float64, numba.float64))
 def generate_square(src_lat: float, src_long: float, distance: float) -> tuple:
     """
