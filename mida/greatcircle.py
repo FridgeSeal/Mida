@@ -65,6 +65,17 @@ def within_radius(src_lat: float, src_long: float, cndt_lat: float, cndt_long: f
     return isinregion
 
 
+def project_array(array: pandas.DataFrame, src_lat: float, src_long: float, distance: float):
+    array = array.values
+    p1 = pyproj.Proj(proj='latlong', datum='WGS84')
+    p2 = pyproj.Proj(init='epsg:2193')  # It's not clear what init does or why it works when proj= randomly fails...
+    x, y = pyproj.transform(p1, p2, src_long, src_lat)
+    arr1 = numpy.array((x, y)).reshape((1, 2))
+    arr2 = numpy.column_stack((pyproj.transform(p1, p2, array[:, 1], array[:, 0])))
+    result = scipy.spatial.distance.cdist(arr1, arr2,)
+    return result.ravel().tolist()
+
+
 def within_square(candidate_lat: float, candidate_long: float, bndry_lat1: float, bndry_lat2: float,
                   bndry_long1: float, bndry_long2: float) -> bool:
     """
